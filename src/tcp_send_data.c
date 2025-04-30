@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #define RCC_APB2ENR     (*(volatile uint32_t*)(0x40021000UL + 0x18UL))
 #define GPIOA_CRH       (*(volatile uint32_t*)(0x40010800UL + 0x04UL))
 #define GPIOA_ODR       (*(volatile uint32_t*)(0x40010800UL + 0x0CUL))
@@ -8,8 +9,11 @@
 #define USART_DR        (*(volatile uint32_t*)(0x40013800UL + 0x04UL))
 #define USART_BRR       (*(volatile uint32_t*)(0x40013800UL + 0x08UL))
 #define USART_CR1       (*(volatile uint32_t*)(0x40013800UL + 0x0CUL))
+#define GPIOC_CRH       (*(volatile uint32_t*)(0x40011000UL + 0x04UL))
+#define GPIOx_ODR       (*(volatile uint32_t*)(0x40011000UL + 0x0CUL))
 bool gh = true;
 void gpioa_init(void);
+void gpioc_init(void);
 void uart_init(void);
 void uart_send(uint8_t data);
 char* uart_receive_string(void);
@@ -27,17 +31,23 @@ void safechanges();
 
 
 int main(){
+    gpioc_init();
+    GPIOx_ODR |= (1 << 13);
     gpioa_init();
     uart_init();
     GPIOA_ODR |= (1<<11);     //rst
     GPIOA_ODR |= (1<<12);    //cfg
+    char received_string[10] = "";
     while (1) {
-        char* received_string = uart_receive_string();  
-        char* str = "alibek nakhimov";
-        if (strcmp(received_string, "ali") == 0) {
-            while (*str) {
-                uart_send(*str++);  
-            }
+        strcpy(received_string, uart_receive_string());
+        char* div = strchr(received_string, ':');
+        *div = '\0';
+        uint8_t value = atoi(div+1);
+        if (strcmp(received_string, "B2") == 0 && value == 1) {
+            GPIOx_ODR &= ~(1 << 13);       
+        }
+        if (strcmp(received_string, "B2") == 0 && value == 0) {
+            GPIOx_ODR |= (1 << 13);       
         }
     }
     
@@ -174,4 +184,10 @@ void safechanges(){
 
 void delay(){
     for(volatile int i = 0; i<=10000; i++);
+}
+void gpioc_init(void){
+    RCC_APB2ENR |= (1 << 4);
+
+    GPIOC_CRH &= ~(15 << 20);
+    GPIOC_CRH |= (1 << 20);
 }
